@@ -1,269 +1,269 @@
-; Générateur de Diagramme de Voronoi
-; Utilise le mode VGA 13h (320x200 pixels, 256 couleurs)
-; Crée un diagramme à partir de 50 points aléatoires
+; Voronoi Diagram Generator
+; Uses VGA mode 13h (320x200 pixels, 256 colors)
+; Builds a diagram from 50 random points
 
-bits 16                     ; Code 16-bit
-org 100h                    ; Format de fichier COM, le code commence à l'offset 100h
-
-;-------------------------------------------------------------------------------
-; Constantes et Configuration
-;-------------------------------------------------------------------------------
-POINTS_COUNT    equ 50     ; Nombre de points aléatoires à générer
-SCREEN_WIDTH    equ 320    ; Largeur de l'écran en mode 13h
-SCREEN_HEIGHT   equ 200    ; Hauteur de l'écran en mode 13h
-VIDEO_SEGMENT   equ 0a000h ; Segment mémoire vidéo pour le mode 13h
-VGA_MODE        equ 13h    ; Mode vidéo VGA 320x200 256 couleurs
-BASE_COLOR      equ 30     ; Couleur de base pour les régions
-POINT_COLOR     equ 0      ; Couleur pour les points (noir)
+bits 16                     ; 16-bit code
+org 100h                    ; COM file format, code starts at offset 100h
 
 ;-------------------------------------------------------------------------------
-; Section des Données
+; Constants and Configuration
+;-------------------------------------------------------------------------------
+POINTS_COUNT    equ 50     ; Number of random points to generate
+SCREEN_WIDTH    equ 320    ; Screen width in mode 13h
+SCREEN_HEIGHT   equ 200    ; Screen height in mode 13h
+VIDEO_SEGMENT   equ 0a000h ; Video memory segment for mode 13h
+VGA_MODE        equ 13h    ; VGA video mode 320x200, 256 colors
+BASE_COLOR      equ 30     ; Base color for the regions
+POINT_COLOR     equ 0      ; Color for the points (black)
+
+;-------------------------------------------------------------------------------
+; Data Section
 ;-------------------------------------------------------------------------------
 section .data
-start:                      ; Point d'entrée du programme
-        finit               ; Initialiser le coprocesseur mathématique
-        call demarrer_mode_graphique
-        call generer_points_aleatoires
-        call dessiner_voronoi
-        call dessiner_points
+start:                      ; Program entry point
+        finit               ; Initialize the math coprocessor
+        call init_graphics_mode
+        call generate_random_points
+        call draw_voronoi
+        call draw_points
 
-attendre_touche:
+wait_key:
         mov ah, 0
         int 16h
 
-quitter_programme:
+exit_program:
         mov ah, 4ch
         int 21h
 
 ;-------------------------------------------------------------------------------
-; Fonctions de Dessin
+; Drawing Functions
 ;-------------------------------------------------------------------------------
-dessiner_voronoi:
-        ; Dessine le diagramme de Voronoi en coloriant chaque pixel en fonction du point le plus proche
-        ; Pour chaque pixel à l'écran :
-        ; 1. Trouver le point le plus proche
-        ; 2. Colorier le pixel en fonction de l'indice de ce point
-        ; Paramètres :
-        ;   al = indice de couleur
-        ;   bx = coordonnée y (0-199)
-        ;   cx = coordonnée x (0-319)
-        mov al, 1              ; Commencer avec l'indice de couleur 1
-        mov cx, 0              ; Commencer à x = 0
-        mov bx, 0              ; Commencer à y = 0
-.pixel_suivant:
-        call calculer_point_plus_proche
-        
+draw_voronoi:
+        ; Draws the Voronoi diagram by coloring each pixel by its closest point
+        ; For each pixel on the screen:
+        ; 1. Find the closest point
+        ; 2. Color the pixel from the index of that point
+        ; Parameters:
+        ;   al = color index
+        ;   bx = y coordinate (0-199)
+        ;   cx = x coordinate (0-319)
+        mov al, 1              ; Start with color index 1
+        mov cx, 0              ; Start at x = 0
+        mov bx, 0              ; Start at y = 0
+.next_pixel:
+        call find_closest_point
+
         pusha
         add al, 30
         shl al, 1
-        call definir_pixel
+        call set_pixel
         popa
-        
+
         inc cx
         cmp cx, 320
-        jne .pixel_suivant
+        jne .next_pixel
         mov cx, 0
         inc bx
         cmp bx, 200
-        jne .pixel_suivant
+        jne .next_pixel
         ret
 
 ;-------------------------------------------------------------------------------
-; Calcul des Points
+; Point Calculation
 ;-------------------------------------------------------------------------------
-calculer_point_plus_proche:
-        ; Trouve le point le plus proche du pixel actuel en utilisant la distance euclidienne
-        ; Utilise l'unité de calcul en virgule flottante (FPU) pour les calculs de distance
-        ; Entrée :
-        ;   bx = coordonnée y du pixel actuel
-        ;   cx = coordonnée x du pixel actuel
-        ; Sortie :
-        ;   al = indice du point le plus proche (basé sur 1)
-        mov al, 0                          ; Initialiser l'indice du point
+find_closest_point:
+        ; Finds the point closest to the current pixel with the Euclidean distance
+        ; Uses the floating-point unit (FPU) for the distance calculations
+        ; Input:
+        ;   bx = y coordinate of the current pixel
+        ;   cx = x coordinate of the current pixel
+        ; Output:
+        ;   al = index of the closest point (1-based)
+        mov al, 0                          ; Initialize the point index
         push bx
         push cx
-        mov word [.cx], cx                 ; Stocker la coordonnée x actuelle
-        mov word [.cy], bx                 ; Stocker la coordonnée y actuelle
-        mov byte [.indice_plus_proche], 0  ; Initialiser l'indice du point le plus proche
-        mov word [.distance_actuelle], 0ffffh; Initialiser la distance actuelle au maximum
-        mov word [.distance_plus_proche], 0ffffh; Initialiser la distance la plus proche au maximum
-        mov cx, POINTS_COUNT               ; Définir le compteur de boucle au nombre de points
-        mov di, 0                          ; Initialiser l'indice du tableau de points
-.suivant:
+        mov word [.cx], cx                 ; Store the current x coordinate
+        mov word [.cy], bx                 ; Store the current y coordinate
+        mov byte [.closest_index], 0       ; Initialize the closest point index
+        mov word [.current_distance], 0ffffh; Set the current distance to the maximum
+        mov word [.closest_distance], 0ffffh; Set the closest distance to the maximum
+        mov cx, POINTS_COUNT               ; Set the loop counter to the number of points
+        mov di, 0                          ; Initialize the point array index
+.next:
         push cx
-        
-        fild word [ds:points + di + 2]     ; Charger la coordonnée y
-        fild word [.cy]                    ; Charger la coordonnée y actuelle
+
+        fild word [ds:points + di + 2]     ; Load the y coordinate
+        fild word [.cy]                    ; Load the current y coordinate
         fsub st0, st1
         fmul st0, st0
-        
-        fild word [ds:points + di]         ; Charger la coordonnée x
-        fild word [.cx]                    ; Charger la coordonnée x actuelle
+
+        fild word [ds:points + di]         ; Load the x coordinate
+        fild word [.cx]                    ; Load the current x coordinate
         fsub st0, st1
         fmul st0, st0
-        
+
         fadd st0, st2
         fsqrt
-        
-        fild word [.v100]                  ; Facteur d'échelle
+
+        fild word [.v100]                  ; Scale factor
         fmul st0, st1
-        
-        fistp word [.distance_actuelle]
+
+        fistp word [.current_distance]
         ffree st0
         ffree st1
         ffree st2
         ffree st3
-        
-        mov cx, [.distance_actuelle]
-        mov bx, [.distance_plus_proche]
+
+        mov cx, [.current_distance]
+        mov bx, [.closest_distance]
         cmp cx, bx
-        jnb .continuer
+        jnb .continue
 
-.definir_nouveau_point_plus_proche:
-        mov [.distance_plus_proche], cx
-        mov [.indice_plus_proche], al
+.set_new_closest:
+        mov [.closest_distance], cx
+        mov [.closest_index], al
 
-.continuer:
+.continue:
         add di, 4
         pop cx
         inc al
-        loop .suivant
-        
+        loop .next
+
         pop cx
         pop bx
-        inc byte [.indice_plus_proche]
-        mov al, [.indice_plus_proche]
+        inc byte [.closest_index]
+        mov al, [.closest_index]
         ret
 .cx dw 0
 .cy dw 0
 .v100 dw 100
-.indice_plus_proche db 0
-.distance_plus_proche dw 0
-.distance_actuelle dw 0
+.closest_index db 0
+.closest_distance dw 0
+.current_distance dw 0
 
 ;-------------------------------------------------------------------------------
-; Dessin des Points
+; Point Drawing
 ;-------------------------------------------------------------------------------
-dessiner_points:
-        ; Dessine tous les points sous forme de carrés noirs de 2x2 pixels
-        ; Chaque point est dessiné en noir (couleur 0) pour la visibilité
-        mov cx, POINTS_COUNT               ; Définir le compteur de boucle
-        mov di, 0                          ; Initialiser l'indice du tableau de points
-.suivant:
+draw_points:
+        ; Draws every point as a black 2x2 pixel square
+        ; Each point is drawn in black (color 0) so it stays visible
+        mov cx, POINTS_COUNT               ; Set the loop counter
+        mov di, 0                          ; Initialize the point array index
+.next:
         push cx
         mov al, 0
         mov cx, word [points + di]
         mov bx, word [points + di + 2]
         add di, 4
-        
+
         pusha
-        call definir_pixel
+        call set_pixel
         popa
-        
+
         pusha
         inc cx
-        call definir_pixel
+        call set_pixel
         popa
-        
+
         pusha
         inc bx
-        call definir_pixel
+        call set_pixel
         popa
-        
+
         pusha
         inc bx
         inc cx
-        call definir_pixel
+        call set_pixel
         popa
-        
+
         pop cx
-        loop .suivant
+        loop .next
         ret
 
 ;-------------------------------------------------------------------------------
-; Génération des Points
+; Point Generation
 ;-------------------------------------------------------------------------------
-generer_points_aleatoires:
-        ; Génère des points aléatoires dans les limites de l'écran
-        ; Les points sont stockés comme des paires (x,y) dans le tableau de points
-        ; Les coordonnées x vont de 0 à 319
-        ; Les coordonnées y vont de 0 à 199
-        mov cx, POINTS_COUNT               ; Définir le compteur de boucle
-        mov di, 0                          ; Initialiser l'indice du tableau de points
-.suivant:
+generate_random_points:
+        ; Generates random points inside the screen bounds
+        ; Points are stored as (x,y) pairs in the point array
+        ; x coordinates go from 0 to 319
+        ; y coordinates go from 0 to 199
+        mov cx, POINTS_COUNT               ; Set the loop counter
+        mov di, 0                          ; Initialize the point array index
+.next:
         push cx
-        
+
         mov bx, 320
-        call generer_nombre_aleatoire
+        call random_number
         mov word [points + di], dx
         add di, 2
-        
+
         mov bx, 200
-        call generer_nombre_aleatoire
+        call random_number
         mov word [points + di], dx
         add di, 2
-        
+
         pop cx
-        loop .suivant
+        loop .next
         ret
 
 ;-------------------------------------------------------------------------------
-; Fonctions Utilitaires
+; Utility Functions
 ;-------------------------------------------------------------------------------
-generer_nombre_aleatoire:
-        ; Génère un nombre pseudo-aléatoire en utilisant l'heure système
-        ; Entrée :
-        ;   bx = valeur maximale (exclusive)
-        ; Sortie :
-        ;   dx = nombre aléatoire dans l'intervalle [0, bx-1]
+random_number:
+        ; Generates a pseudo-random number from the system time
+        ; Input:
+        ;   bx = maximum value (exclusive)
+        ; Output:
+        ;   dx = random number in the range [0, bx-1]
         mov ah, 0
-        int 1ah                           ; Obtenir l'heure système (cx:dx = ticks d'horloge)
+        int 1ah                           ; Get the system time (cx:dx = clock ticks)
         push cx
         push dx
-        
+
         mov ax, dx
         mul cx
-        xor ax, [.graine]
+        xor ax, [.seed]
         xor dx, dx
-        div bx                            ; dx = reste de la division
-        
+        div bx                            ; dx = division remainder
+
         pop bx
         pop cx
-        add [.graine], bx
-        add [.graine], cx
+        add [.seed], bx
+        add [.seed], cx
         ret
-.graine dw 0
+.seed dw 0
 
-demarrer_mode_graphique:
-        ; Initialise le mode VGA 13h (320x200, 256 couleurs)
-        ; Configure le segment ES pour pointer vers la mémoire vidéo à A000:0000
-        mov ax, 0a000h                     ; Segment de mémoire vidéo
-        mov es, ax                         ; Définir ES au segment vidéo
-        mov ah, 0                          ; Fonction 0 - définir le mode vidéo
-        mov al, 13h                        ; Mode 13h - 320x200, 256 couleurs
-        int 10h                           ; Appeler l'interruption vidéo BIOS
+init_graphics_mode:
+        ; Sets VGA mode 13h (320x200, 256 colors)
+        ; Points the ES segment to video memory at A000:0000
+        mov ax, 0a000h                     ; Video memory segment
+        mov es, ax                         ; Set ES to the video segment
+        mov ah, 0                          ; Function 0 - set video mode
+        mov al, 13h                        ; Mode 13h - 320x200, 256 colors
+        int 10h                           ; Call the BIOS video interrupt
         ret
 
-definir_pixel:
-        ; Définit un pixel à l'écran
-        ; Entrée :
-        ;   al = couleur (0-255)
-        ;   bx = coordonnée y (0-199)
-        ;   cx = coordonnée x (0-319)
-        pusha                             ; Sauvegarder tous les registres
-        xor dx, dx                        ; Effacer DX pour la multiplication
-        push ax                           ; Sauvegarder la couleur
-        mov ax, 320                       ; Largeur de l'écran
-        mul bx                            ; Calculer y * 320
-        add ax, cx                        ; Ajouter l'offset x
-        mov bx, ax                        ; Déplacer l'offset vers BX
-        pop ax                            ; Restaurer la couleur
-        mov byte [es:bx], al              ; Écrire le pixel dans la mémoire vidéo
-        popa                              ; Restaurer tous les registres
+set_pixel:
+        ; Draws one pixel on the screen
+        ; Input:
+        ;   al = color (0-255)
+        ;   bx = y coordinate (0-199)
+        ;   cx = x coordinate (0-319)
+        pusha                             ; Save all registers
+        xor dx, dx                        ; Clear DX for the multiplication
+        push ax                           ; Save the color
+        mov ax, 320                       ; Screen width
+        mul bx                            ; Compute y * 320
+        add ax, cx                        ; Add the x offset
+        mov bx, ax                        ; Move the offset to BX
+        pop ax                            ; Restore the color
+        mov byte [es:bx], al              ; Write the pixel to video memory
+        popa                              ; Restore all registers
         ret
 
 ;-------------------------------------------------------------------------------
-; Section BSS
+; BSS Section
 ;-------------------------------------------------------------------------------
 section .bss
-points resw POINTS_COUNT * 2               ; Tableau pour stocker les coordonnées des points
+points resw POINTS_COUNT * 2               ; Array that stores the point coordinates

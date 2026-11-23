@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="100%" height="100%">
+  <defs>
+    <clipPath id="frame">
+      <rect width="256" height="256" rx="48"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#frame)" stroke="#171717" stroke-width="4" stroke-linejoin="round">
+    <polygon fill="#2563eb" points="0.0,0.0 95.9,0.0 103.7,63.9 72.3,87.2 0.0,56.7"/>
+    <polygon fill="#7c3aed" points="95.9,0.0 242.0,0.0 151.3,90.7 103.7,63.9"/>
+    <polygon fill="#db2777" points="242.0,0.0 256.0,0.0 256.0,148.1 219.1,152.3 157.8,116.2 151.3,90.7"/>
+    <polygon fill="#f59e0b" points="92.7,169.4 61.6,131.2 72.3,87.2 103.7,63.9 151.3,90.7 157.8,116.2 107.3,170.6"/>
+    <polygon fill="#10b981" points="12.3,256.0 0.0,256.0 0.0,140.0 61.6,131.2 92.7,169.4"/>
+    <polygon fill="#0ea5e9" points="107.3,170.6 157.8,116.2 219.1,152.3 159.0,234.2"/>
+    <polygon fill="#ef4444" points="256.0,148.1 256.0,256.0 160.5,256.0 159.0,234.2 219.1,152.3"/>
+    <polygon fill="#84cc16" points="160.5,256.0 12.3,256.0 92.7,169.4 107.3,170.6 159.0,234.2"/>
+    <polygon fill="#f97316" points="0.0,140.0 0.0,56.7 72.3,87.2 61.6,131.2"/>
+  </g>
+  <g fill="#171717">
+    <rect x="47" y="43" width="10" height="10"/>
+    <rect x="145" y="31" width="10" height="10"/>
+    <rect x="201" y="87" width="10" height="10"/>
+    <rect x="99" y="113" width="10" height="10"/>
+    <rect x="35" y="165" width="10" height="10"/>
+    <rect x="155" y="165" width="10" height="10"/>
+    <rect x="215" y="209" width="10" height="10"/>
+    <rect x="91" y="217" width="10" height="10"/>
+    <rect x="25" y="95" width="10" height="10"/>
+  </g>
+</svg>
